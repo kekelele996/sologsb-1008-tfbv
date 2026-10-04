@@ -1,4 +1,11 @@
-import type { ReviewStatus, SignItem, SignProject, TermBinding } from "./types";
+import type {
+  PlaceEntry,
+  ReviewStatus,
+  SignItem,
+  SignProject,
+  TermBinding,
+  WorkspaceState,
+} from "./types";
 
 export const uid = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -18,6 +25,41 @@ const term = (source: string, target: string, confirmed = false, required = true
   confirmed,
 });
 
+export const createSeedPlaces = (): PlaceEntry[] => [
+  {
+    id: "place-binhai-center",
+    name: "滨海中心站",
+    spelling: "Binhai Zhongxin Zhan",
+    status: "active",
+    effectiveAt: "2026-08-01T00:00:00.000Z",
+    history: [{ spelling: "Binhai Zhongxin Zhan", status: "active", at: "2026-08-01T00:00:00.000Z" }],
+  },
+  {
+    id: "place-yellow-river",
+    name: "黄河路",
+    spelling: "Huanghe Lu",
+    status: "active",
+    effectiveAt: "2026-08-01T00:00:00.000Z",
+    history: [{ spelling: "Huanghe Lu", status: "active", at: "2026-08-01T00:00:00.000Z" }],
+  },
+  {
+    id: "place-emerald-park",
+    name: "翠竹公园",
+    spelling: "Cuizhu Gongyuan",
+    status: "active",
+    effectiveAt: "2026-08-01T00:00:00.000Z",
+    history: [{ spelling: "Cuizhu Gongyuan", status: "active", at: "2026-08-01T00:00:00.000Z" }],
+  },
+  {
+    id: "place-people-hospital",
+    name: "人民医院",
+    spelling: "Renmin Yiyuan",
+    status: "active",
+    effectiveAt: "2026-08-01T00:00:00.000Z",
+    history: [{ spelling: "Renmin Yiyuan", status: "active", at: "2026-08-01T00:00:00.000Z" }],
+  },
+];
+
 export const createSeedProject = (): SignProject => {
   const signs: SignItem[] = [
     {
@@ -26,10 +68,15 @@ export const createSeedProject = (): SignProject => {
       sourceText: "候车区。请在黄线内排队，照看好随身物品。",
       targetLanguage: "English",
       targetText: "Waiting Area\nPlease queue behind the yellow line and keep your belongings with you.",
-      scenario: "轨道交通站台",
+      scenario: "滨海中心站轨道交通站台",
       regulation: "GB/T 10001.1-2023 公共信息图形符号",
       status: "pending",
       terms: [term("候车区", "Waiting Area"), term("黄线", "yellow line")],
+      placeRefs: [
+        { id: uid("ref"), placeId: "place-binhai-center", citedSpelling: "Binhai Zhongxin Zhan" },
+        { id: uid("ref"), placeId: "place-yellow-river", citedSpelling: "Huanghe Lu" },
+      ],
+      spellingChanges: [],
       comments: [],
       versions: [],
       emergencyRevision: false,
@@ -41,10 +88,12 @@ export const createSeedProject = (): SignProject => {
       sourceText: "紧急出口。发生紧急情况时，请按指示方向迅速撤离，不要乘坐电梯。",
       targetLanguage: "English",
       targetText: "EMERGENCY EXIT\nIn an emergency, leave quickly in the direction shown. Do not use the elevator.",
-      scenario: "商场疏散通道",
+      scenario: "翠竹公园商场疏散通道",
       regulation: "GB 13495.1-2015 消防安全标志",
       status: "confirmed",
       terms: [term("紧急出口", "EMERGENCY EXIT", true), term("电梯", "elevator", true)],
+      placeRefs: [{ id: uid("ref"), placeId: "place-emerald-park", citedSpelling: "Cuizhu Gongyuan" }],
+      spellingChanges: [],
       comments: [],
       versions: [],
       emergencyRevision: false,
@@ -56,10 +105,12 @@ export const createSeedProject = (): SignProject => {
       sourceText: "直饮水。请勿将茶叶、果皮等杂物丢入水槽。",
       targetLanguage: "日本語",
       targetText: "飲料水\n茶殻や果物の皮などを流さないでください。",
-      scenario: "公园服务亭",
+      scenario: "翠竹公园服务亭",
       regulation: "城市公共设施双语标识译写规范",
       status: "changes",
       terms: [term("直饮水", "飲料水"), term("水槽", "排水口")],
+      placeRefs: [{ id: uid("ref"), placeId: "place-emerald-park", citedSpelling: "Cuizhu Gongyuan" }],
+      spellingChanges: [],
       comments: [],
       versions: [],
       emergencyRevision: false,
@@ -71,10 +122,12 @@ export const createSeedProject = (): SignProject => {
       sourceText: "禁止吸烟。包括电子烟。",
       targetLanguage: "Français",
       targetText: "INTERDICTION DE FUMER\nCigarettes électroniques incluses.",
-      scenario: "医院入口",
+      scenario: "人民医院入口",
       regulation: "公共场所卫生管理条例实施细则",
       status: "draft",
       terms: [term("禁止吸烟", "INTERDICTION DE FUMER"), term("电子烟", "Cigarettes électroniques")],
+      placeRefs: [{ id: uid("ref"), placeId: "place-people-hospital", citedSpelling: "Renmin Yiyuan" }],
+      spellingChanges: [],
       comments: [],
       versions: [],
       emergencyRevision: false,
@@ -91,3 +144,9 @@ export const createSeedProject = (): SignProject => {
     updatedAt: new Date().toISOString(),
   };
 };
+
+export const createSeedWorkspace = (): WorkspaceState => ({
+  places: createSeedPlaces(),
+  project: createSeedProject(),
+  ambiguities: [],
+});
