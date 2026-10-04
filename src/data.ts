@@ -1,4 +1,5 @@
 import type { ReviewStatus, SignItem, SignProject, TermBinding } from "./types";
+import { SEED_PLACE_IDS } from "./places";
 
 export const uid = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -23,9 +24,9 @@ export const createSeedProject = (): SignProject => {
     {
       id: "sign-platform",
       code: "TR-01",
-      sourceText: "候车区。请在黄线内排队，照看好随身物品。",
+      sourceText: "滨海站候车区。请在黄线内排队，照看好随身物品。",
       targetLanguage: "English",
-      targetText: "Waiting Area\nPlease queue behind the yellow line and keep your belongings with you.",
+      targetText: "Binhai Station Waiting Area\nPlease queue behind the yellow line and keep your belongings with you.",
       scenario: "轨道交通站台",
       regulation: "GB/T 10001.1-2023 公共信息图形符号",
       status: "pending",
@@ -33,14 +34,16 @@ export const createSeedProject = (): SignProject => {
       comments: [],
       versions: [],
       emergencyRevision: false,
+      placeRefs: [SEED_PLACE_IDS.binhaiStation],
+      placeFindings: [],
       updatedAt: "2026-09-21T09:20:00.000Z",
     },
     {
       id: "sign-exit",
       code: "EM-02",
-      sourceText: "紧急出口。发生紧急情况时，请按指示方向迅速撤离，不要乘坐电梯。",
+      sourceText: "迎宾路紧急出口。发生紧急情况时，请按指示方向迅速撤离，不要乘坐电梯。",
       targetLanguage: "English",
-      targetText: "EMERGENCY EXIT\nIn an emergency, leave quickly in the direction shown. Do not use the elevator.",
+      targetText: "Yingbin Road EMERGENCY EXIT\nIn an emergency, leave quickly in the direction shown. Do not use the elevator.",
       scenario: "商场疏散通道",
       regulation: "GB 13495.1-2015 消防安全标志",
       status: "confirmed",
@@ -48,14 +51,16 @@ export const createSeedProject = (): SignProject => {
       comments: [],
       versions: [],
       emergencyRevision: false,
+      placeRefs: [SEED_PLACE_IDS.yingbinRoad],
+      placeFindings: [],
       updatedAt: "2026-09-18T06:10:00.000Z",
     },
     {
       id: "sign-water",
       code: "SV-03",
-      sourceText: "直饮水。请勿将茶叶、果皮等杂物丢入水槽。",
+      sourceText: "滨海客运码头直饮水。请勿将茶叶、果皮等杂物丢入水槽。",
       targetLanguage: "日本語",
-      targetText: "飲料水\n茶殻や果物の皮などを流さないでください。",
+      targetText: "滨海客运码头 飲料水\n茶殻や果物の皮などを流さないでください。",
       scenario: "公园服务亭",
       regulation: "城市公共设施双语标识译写规范",
       status: "changes",
@@ -63,6 +68,8 @@ export const createSeedProject = (): SignProject => {
       comments: [],
       versions: [],
       emergencyRevision: false,
+      placeRefs: [SEED_PLACE_IDS.ferryTerminal],
+      placeFindings: [],
       updatedAt: "2026-09-23T02:40:00.000Z",
     },
     {
@@ -78,6 +85,8 @@ export const createSeedProject = (): SignProject => {
       comments: [],
       versions: [],
       emergencyRevision: false,
+      placeRefs: [],
+      placeFindings: [],
       updatedAt: "2026-09-24T04:15:00.000Z",
     },
   ];

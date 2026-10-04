@@ -1,8 +1,21 @@
 import { $, component$, useSignal, useVisibleTask$, type QRL } from "@builder.io/qwik";
 import { type DocumentHead } from "@builder.io/qwik-city";
 import { createSeedProject, STATUS_LABELS, uid } from "../data";
-import type { ReviewStatus, SignItem, SignProject } from "../types";
+import type { PlaceNamePackage, ReviewStatus, SignItem, SignProject } from "../types";
 import { analyzeSign, cloneTerms, diffText } from "../utils";
+import {
+  applyUpgrades,
+  createSeedPlaceTable,
+  loadPlaceTable,
+  reconcileProject,
+  savePlaceTable,
+  scanUpgrades,
+  type UpgradeScan,
+} from "../places";
+import { PlaceManager } from "../components/place-manager";
+import { ImportDialog } from "../components/import-dialog";
+import { UpgradeDialog } from "../components/upgrade-dialog";
+import { SignPlaceRefs } from "../components/sign-place-refs";
 
 const STORAGE_KEY = "sologsb-1008-project-v1";
 const WIDTHS = [320, 480, 720, 960] as const;
@@ -38,6 +51,11 @@ export default component$(() => {
   const toast = useSignal("");
   const previewId = useSignal("");
   const readOnly = useSignal(false);
+  const placeTable = useSignal<PlaceNamePackage>(createSeedPlaceTable());
+  const view = useSignal<"review" | "places">("review");
+  const importOpen = useSignal(false);
+  const upgradeOpen = useSignal(false);
+  const upgradeScan = useSignal<UpgradeScan | null>(null);
   const active = () => project.value.signs.find((sign) => sign.id === (previewId.value || project.value.activeSignId)) ?? project.value.signs[0];
 
   const commit = $((label: string, update: (draft: SignProject) => void) => {
@@ -174,6 +192,58 @@ export default component$(() => {
     toast.value = "只读预览链接已复制";
   });
 
+  const handleTableChange: QRL<(next: PlaceNamePackage, shouldReconcile: boolean, message: string) => void> = $((next, shouldReconcile, message) => {
+    placeTable.value = next;
+    savePlaceTable(next);
+    if (shouldReconcile) {
+      const result = reconcileProject(project.value, next);
+      project.value = result.project;
+      toast.value = `${message}；对账完成，${result.report.returned} 处退回修改，${result.report.unchanged} 处照旧`;
+    } else {
+      toast.value = message;
+    }
+  });
+
+  const handleImport: QRL<(table: PlaceNamePackage) => void> = $((table) => {
+    placeTable.value = table;
+    savePlaceTable(table);
+    importOpen.value = false;
+    const result = reconcileProject(project.value, table);
+    project.value = result.project;
+    toast.value = `拼写表已导入，对账完成：${result.report.returned} 处退回修改，${result.report.unchanged} 处照旧`;
+  });
+
+  const reconcile: QRL<() => void> = $(() => {
+    const result = reconcileProject(project.value, placeTable.value);
+    project.value = result.project;
+    toast.value = `对账完成：${result.report.returned} 处退回修改，${result.report.unchanged} 处照旧`;
+  });
+
+  const openUpgrade: QRL<() => void> = $(() => {
+    upgradeScan.value = scanUpgrades(project.value.signs, placeTable.value);
+    upgradeOpen.value = true;
+  });
+
+  const applyUpgrade: QRL<(resolutions: Record<string, string | null>) => void> = $((resolutions) => {
+    if (!upgradeScan.value) return;
+    project.value = applyUpgrades(project.value, upgradeScan.value, resolutions);
+    upgradeOpen.value = false;
+    upgradeScan.value = null;
+    toast.value = "地名认领已应用";
+  });
+
+  const addPlaceRef: QRL<(placeId: string) => void> = $((placeId) => {
+    updateActive("添加地名引用", (sign) => {
+      if (!(sign.placeRefs ?? []).includes(placeId)) sign.placeRefs = [...(sign.placeRefs ?? []), placeId];
+    });
+  });
+
+  const removePlaceRef: QRL<(placeId: string) => void> = $((placeId) => {
+    updateActive("移除地名引用", (sign) => {
+      sign.placeRefs = (sign.placeRefs ?? []).filter((id) => id !== placeId);
+    });
+  });
+
   const preview = () => analyzeSign(active(), previewWidth.value, previewFont.value);
   const selectedVersion = () => active().versions.find((version) => version.id === selectedVersionId.value) ?? active().versions[0];
   const comparison = () => {
@@ -186,10 +256,18 @@ export default component$(() => {
     if (!hydrated.value) {
       try {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "") as { schema: number; project: SignProject };
-        if (stored.schema === 1 && stored.project?.signs?.length) project.value = stored.project;
+        if (stored.schema === 1 && stored.project?.signs?.length) {
+          project.value = stored.project;
+          // 兼容旧稿：补齐地名引用字段，等待「升级旧稿」按拼写认领。
+          for (const sign of project.value.signs) {
+            if (!Array.isArray(sign.placeRefs)) sign.placeRefs = [];
+            if (!Array.isArray(sign.placeFindings)) sign.placeFindings = [];
+          }
+        }
         const requestedPreview = new URLSearchParams(window.location.search).get("preview") ?? "";
         previewId.value = requestedPreview;
         readOnly.value = Boolean(requestedPreview);
+        placeTable.value = loadPlaceTable();
       } catch {
         // Keep bundled sample data when storage is unavailable or malformed.
       }
@@ -301,13 +379,23 @@ export default component$(() => {
         </div>
       </header>
 
-      {active().emergencyRevision && (
-        <div class="alert alert-error sticky top-16 z-30 rounded-none border-x-0 py-2 text-white">
+      {active().emergencyRevision && view.value === "review" && (
+        <div class="alert alert-error rounded-none border-x-0 py-2 text-white">
           <span class="text-lg">!</span>
           <span><strong>紧急修订模式</strong>：确认操作已锁定，修改后必须重新审校并保存版本。</span>
         </div>
       )}
 
+      <div class="sticky top-16 z-30 flex gap-1 bg-slate-800 px-5 py-1.5">
+        <button class={`btn btn-sm ${view.value === "review" ? "btn-primary" : "btn-ghost text-white hover:bg-white/10"}`} onClick$={() => { view.value = "review"; }}>标识校对台</button>
+        <button class={`btn btn-sm ${view.value === "places" ? "btn-primary" : "btn-ghost text-white hover:bg-white/10"}`} onClick$={() => { view.value = "places"; }}>地名管理</button>
+      </div>
+
+      {view.value === "places" ? (
+        <div class="mx-auto max-w-5xl p-6">
+          <PlaceManager table={placeTable.value} onChange$={handleTableChange} onImportClick$={() => { importOpen.value = true; }} />
+        </div>
+      ) : (
       <div class="grid min-h-[calc(100vh-64px)] grid-cols-[270px_minmax(560px,1fr)_430px] gap-px bg-slate-300">
         <aside class="overflow-y-auto bg-slate-50 p-3">
           <div class="mb-3 rounded-xl bg-white p-4 shadow-sm">
@@ -332,6 +420,12 @@ export default component$(() => {
                     <span class={`badge badge-sm ${statusClass(sign.status)}`}>{STATUS_LABELS[sign.status]}</span>
                   </div>
                   <div class="mt-2 line-clamp-2 text-sm font-semibold text-slate-700">{sign.sourceText}</div>
+                  {(sign.placeRefs?.length > 0 || sign.placeFindings?.length > 0) && (
+                    <div class="mt-1 flex items-center gap-1 text-[10px]">
+                      {sign.placeRefs?.length > 0 && <span class="badge badge-xs badge-ghost">地名 {sign.placeRefs.length}</span>}
+                      {sign.placeFindings?.length > 0 && <span class="badge badge-xs badge-error">对账差异 {sign.placeFindings.length}</span>}
+                    </div>
+                  )}
                   <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
                     <span>{sign.targetLanguage}</span>
                     <span class={risk.risk === "high" ? "font-bold text-error" : risk.risk === "medium" ? "font-bold text-warning" : "text-success"}>
@@ -452,6 +546,15 @@ export default component$(() => {
               </div>
             </section>
 
+            <SignPlaceRefs
+              sign={active()}
+              table={placeTable.value}
+              onAddRef$={addPlaceRef}
+              onRemoveRef$={removePlaceRef}
+              onReconcile$={reconcile}
+              onUpgrade$={openUpgrade}
+            />
+
             <section class="card border border-slate-200 bg-white shadow-sm">
               <div class="card-body p-5">
                 <h2 class="font-bold">审校意见与回复</h2>
@@ -551,6 +654,10 @@ export default component$(() => {
           </section>
         </aside>
       </div>
+      )}
+
+      <ImportDialog open={importOpen.value} onClose$={() => { importOpen.value = false; }} onImport$={handleImport} />
+      <UpgradeDialog open={upgradeOpen.value} scan={upgradeScan.value} onClose$={() => { upgradeOpen.value = false; }} onApply$={applyUpgrade} />
 
       {toast.value && <div class="toast toast-end z-50"><div class="alert alert-success"><span>{toast.value}</span></div></div>}
     </div>
